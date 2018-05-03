@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>stream</title>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<style>
+
+    button {
+        left: 10px;
+        top: 10px;
+        position:absolute;
+    }
+
+    div.tool_tip {
+        width: 100px;
+        position: absolute;
+        height: 20px;
+        padding: 2px;
+        text-align: center;
+        font: 12px sans-serif;
+        color: white ;
+        pointer-events: none;
+        border: 0px;
+        border-radius: 8px;
+        background: orangered;
+    }
+</style>
+
+</head>
+<body>
+
+<h4>Aviation Accidents across the globe Based on Weather Conditions</h4>
+<h4>Explore the Options for a different view</h4>
+
+
+<div id="option">
+    <!-- creation of buttons for selections-->
+    <input name="updateButton"
+           type="button"
+           value="TFI"
+           onclick="file1()" />
+    <input name="updateButton"
+           type="button"
+           value="TSI"
+           onclick="file2()" />
+       <input name="updateButton"
+           type="button"
+           value="TMI"
+           onclick="file3()" />
+    <input name="updateButton"
+           type="button"
+           value="TUI"
+           onclick="file3()" />
+</div>
+
+<script>
+//defining the margin and dimensions for the svg area of stream graph
+var margin = { top: 50, bottom: 100, left: 50,right: 0},
+    width = 700, height = 500,
+    //array for the input json files
+    files = ["tfi.json", "tui.json","tmi.json", "tsi.json"];
+
+//importing the json file for Stream graph
+
+var Stream_graph = function(stream_data) {
+
+    d3.json(stream_data, function (error, data) {
+
+//        Error check for data import
+        if (error) console.log("error: data not loaded");
+
+        data.forEach(function (d) {
+            d.year = +d.Year;
+            d.vmc = +d.VMC;
+            d.imc = +d.IMC;
+            d.unk = +d.UNK;
+        });
+
+        d3.selectAll("svg").remove();
+
+//stream stack defining for the weather conditions
+        var stream = d3.stack()
+            .keys(["VMC", "IMC", "UNK"])
+            .order(d3.stackOrderDecending)
+            .offset(d3.stackOffsetWiggle);
+
+        var series = stream(data);
+
+        //scaling x-axis with year data
+        var x_scale = d3.scaleLinear()
+            .domain(d3.extent(data, function (d) {
+                return d.year;
+            }))
+            .range([10, width - 30]);
+
+        // setting up year axis
+        var x_Axis = d3.axisBottom(x_scale);
+
+        //scaling y-axis for layer of stream graph
+        var y_scale = d3.scaleLinear()
+            .domain([0, d3.max(series, function (layer) {
+                return d3.max(layer, function (d) {
+                    return d[0] + d[1];
+                });
+            })])
+            .range([height - 200, 0]);
+
+        //defining scale for the color array of streams
+        var color = d3.scaleLinear()
+            .range(["#F2C14A", "#B2184C","#E75F7E"]);
+
+
+        //defining the area of the stream
+        var stream_area = d3.area()
+            .x(function (d) {
+                return x_scale(d.data.year);
+            })
+            .y0(function (d) {
+                return y_scale(d[0]);
+            })
+            .y1(function (d) {
+                return y_scale(d[1]);
+            })
+            .curve(d3.curveBasisOpen);
+
+
+        var div = d3.select("body").append("div")
+            .attr("class", "tool_tip")
+            .style("opacity", 0);
+
+//defining the svg area for the stream graph
+        var svg_area = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        d3.selectAll("path").remove();
+
+        var g = svg_area.append("g");
+
+//defining and appending the path of svg elemen
+        g.selectAll("path")
+            .data(series)
+            .enter().append("path")
+            .attr("d", stream_area)
+            .style("fill", function () {
+                return color(Math.random());
+            })
+            .style("opacity","0.8")
+            .on("mouseover", function(d) {
+                div.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                div.html("Value: " + (d.key) )
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top", (d3.event.pageY - 28) + "px");
+
+                g.select("path").transition()
+                    .duration(200)
+                    .style("opacity","1.0");
+            })
+            .on("mouseout", function(d) {
+                div.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+
+                g.selectAll("path").transition()
+                    .duration(200)
+                    .style("opacity","0.8");
+
+            });
+
+        svg_area.append("g")
+            .attr("class", "axis axis--x")
+            .attr("transform", "translate(0," + (height - 30) + ")")
+            .call(x_Axis);
+    })
+}
+
+Stream_graph(files[0]);
+
+// functions for file selections
+function file1() {
+
+    Stream_graph(files[1]);
+
+}
+
+function file2() {
+
+    Stream_graph(files[2]);
+
+}
+
+function file3() {
+
+    Stream_graph(files[3]);
+
+}
+
+
+
+</script>
+</body>
+</html>

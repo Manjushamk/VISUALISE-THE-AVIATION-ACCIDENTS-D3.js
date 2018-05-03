@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bubble chart</title>
+    <script src="//d3js.org/d3.v4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.2/d3.min.js"></script>
+<style>
+
+
+    div.tool_tip {
+    background: orangered;
+    position: absolute;
+    text-align: center;
+    font: 12px sans-serif;
+    color: white ;
+    width: 150px;
+    height: 30px;
+    padding: 2px;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+    }
+
+
+</style>
+</head>
+<body>
+
+<h4>Aviation Accidents across the globe Based on Phases of Accidents</h4>
+<h4>Explore the Options for a different view</h4>
+
+<button id="split">Split By Year</button>
+<button id ="merge">Merge</button>
+<button id ="split1">Split by Phase</button>
+<div id="bubble_chart"></div>
+<script>
+
+    var width = 1200;
+    height = 800;
+
+    //defining the color scale
+    color_scale = d3.scaleOrdinal(d3.schemeCategory20);
+
+    // array for phase of flight
+    var phase = ["OTHER", "STANDING", "UNKNOWN","GO-AROUND", "CLIMB", "DESCENT" ,"TAXI", "APPROACH", "MANEUVERING",
+        "CRUISE", "TAKEOFF", "LANDING"];
+    // array of years in the data
+    var years = [2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017];
+
+    //svg area definition
+    var svg_area = d3.select("#bubble_chart")
+        .append("svg")
+        .attr("height",height)
+        .attr("width",width)
+        .append("g")
+        .attr("transform","translate(0,0)");
+
+    // defining forces for merge and spliting
+    var force_Vertical = d3.forceY(function(d){
+        for (var i = 1; i <= years.length;i++){
+            //years.length;i++) {
+            if(d.year == years[i-1]){
+                if(d.year % 3 == 0)
+                    return 120;
+                else if(d.year % 3 == 1)
+                    return 370;
+                else if(d.year % 3 == 2)
+                    return 620;
+            }
+        }
+    }).strength(0.05);
+
+    var force_Horizontal = d3.forceX(function(d){
+        for (var i = 1; i <= years.length;i++) {
+            if(d.year == years[i-1]){
+                if(i% 5 == 0)
+                {
+                    return 100;
+                }
+                if(i%5 == 1)
+                {
+                    return 350;
+                }
+                if(i%5 == 2)
+                {
+                    return 600;
+                }
+                if(i%5 == 3)
+                {
+                    return 850;
+                }
+                if(i%5 == 4)
+                {
+                    return 1100;
+                }
+            }}
+    }).strength(0.05);
+
+    var force_Horizontal_year = d3.forceX(function(d){
+        for (var i = 1; i <= phase.length;i++) {
+            if(d.BroadPhaseofFlight == phase[i-1]){
+                if(i% 4 == 0)
+                {
+                    return 150;
+                }
+                if(i%4 == 1)
+                {
+                    return 450;
+                }
+                if(i%4 == 2)
+                {
+                    return 750;
+                }
+                if(i%4 == 3)
+                {
+                    return 1050;
+                }
+            }
+        }
+    }).strength(0.05);
+
+    var force_Vertical_year = d3.forceY(function(d){
+        for (var i = 1; i <= phase.length;i++){
+            if(d.BroadPhaseofFlight == phase[i-1]){
+                if(i <=4)
+                    return 100;
+                else if(i>4 && i<= 8)
+                    return 350;
+                else if(i>8 && i<= 12)
+                    return 600;
+            }
+        }
+    }).strength(0.05);
+
+
+    //force simulation
+    var simulation = d3.forceSimulation()
+        //forces for default setting of x and y forces
+        .force("x",d3.forceX(width/2).strength(0.04))
+        .force("y",d3.forceY(height/2).strength(0.04))
+        //defining the colliding
+        .force("collide",d3.forceCollide(function(d){
+                return radiusScale(d.count) + 1;
+            }
+        ));
+
+    // defining the radius scale
+    radiusScale = d3.scaleSqrt().domain([1,542]).range([15,30]);
+
+    //importing data from csv
+    d3.csv("data_count_1.csv",function(error,data){
+
+        var bubble_div = d3.select("body").append("div")
+            .attr("class", "tool_tip")
+            .style("opacity", 0);
+
+        var circles = svg_area.selectAll(".circles")
+            .data(data)
+            .enter()
+            .append("circle")
+            .attr("class","circles")
+            .attr("r",function(d){
+                return radiusScale(d.count);
+            })
+            .attr("fill",function(d){return color_scale(d.BroadPhaseofFlight)})
+            .style("stroke","black")
+            .style("stroke-width","0.5px")
+            .on("mouseover", function(d) {
+                bubble_div.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                bubble_div.html("Year: " + (d.year) + "<br/>" + "Phase: "+  d.BroadPhaseofFlight)
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top", (d3.event.pageY - 28) + "px");
+            })
+            .on("mouseout", function(d) {
+                bubble_div.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+            });
+
+//selections part for split and merge
+        d3.select("#split")
+            .on("click",function(){
+                simulation
+                    .force("x",force_Horizontal)
+                    .force("y",force_Vertical)
+                    .alphaTarget(0.5)
+                    .restart();
+            });
+
+        d3.select("#split1")
+            .on("click",function(){
+                simulation
+                    .force("x",force_Horizontal_year)
+                    .force("y",force_Vertical_year)
+                    .alphaTarget(0.9)
+                    .restart();
+            });
+
+        d3.select("#merge")
+            .on("click",function(){
+                simulation
+                    .force("x",d3.forceX(width/2).strength(0.05))
+                    .force("y",d3.forceY(height/2).strength(0.05))
+                    .force("collide",d3.forceCollide(function(d){
+                            return radiusScale(d.count) + 1;
+                        }
+                    ))
+                    .alphaTarget(0.002)
+                    .restart();
+
+            });
+
+        simulation.nodes(data)
+            .on("tick",ticked);
+
+        function ticked() {
+            circles.attr("cx", function (d) {
+                return d.x;
+            })
+                .attr("cy", function (d) {
+                    return d.y;
+                });
+        }
+        //format the text for each bubble
+
+    })
+</script>
+
+
+</body>
+</html>

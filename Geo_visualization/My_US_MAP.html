@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>US MAP</title>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+</head>
+<style>
+    .border {
+        stroke-width: 0.5px;
+        stroke: white;
+    }
+
+    .background {
+        pointer-events: all;
+        fill: none;
+    }
+
+    div.tool_tip {
+        pointer-events: none;
+        border: 1px;
+        width: 150px;
+        height: 50px;
+        text-align: center;
+        border-radius: 8px;
+        font: 12px sans-serif;
+        position: absolute;
+        background: #def1eb;
+        padding: 2px;
+    }
+
+    .Select_drop_down {
+        top: 10px;
+        position: absolute;
+        left: 10px;
+    }
+    #selection_box{
+        position:absolute;
+        top:5px;
+        left:80px;}
+
+    #image{
+        position:absolute;
+        top:50px;
+        left:30px;
+    }
+</style>
+<body style = "background-color:#6bacae" >
+<!--Selection drop down-->
+<div class = "Select_drop_down">
+    <text color = "white">  Year : </text>
+
+    <select id="selection_box">
+        <option value=2017 >2017</option>
+        <option value=2016 >2016</option>
+        <option value=2015>2015</option>
+        <option value=2014>2014</option>
+        <option value=2013>2013</option>
+        <option value=2012 selected="selected">2012</option>
+    </select>
+</div>
+
+<div id = "image">
+    <a href = "Worldchart.html"> <img src="worldlogo.png" alt="No Link" style="width:150px;height:110px;border:0"></a>
+</div>
+
+
+<script>
+//dimensions of map
+var width = 1100,
+ height = 550,
+    centered;
+
+//array defining the categories of aircrafts present in the dataset
+var Category = ["Airplane","Balloon","Glider","Gyrocraft","Gyroplane","Helicopter","Powered Parachute","Rocket","Ultralight","Weight-Shift","Unknown"];
+
+// Definition of div for the tool tip
+var div = d3.select("body").append("div")
+    .attr("class", "tool_tip")
+    .style("opacity", 0);
+
+color = d3.scale.category20();
+
+// defining projection for map
+var map_projection =  d3.geo.albersUsa()
+        .scale([900])
+        .translate([width/2, height/2]);
+
+//generate path for geo map
+    var map_path = d3.geo.path()
+        .projection(map_projection);
+
+//creating svg area for the map
+var svg_area = d3.select("body")
+    .append("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .style("background-color","#6bacae");
+
+var g = svg_area.append("g");
+
+//function for filtering the data as per the drop down selection
+function select_data(sel_data,key,value){
+    var selection_data = [];
+    sel_data.forEach(function(val,idx,arr){
+        if(val[key] == value) {
+            selection_data.push(val)
+        }
+    })
+    return selection_data;
+}
+
+// defining legend for category
+var category_legend = g.append("g")
+    .attr("font-family", "sans-serif")
+    .attr("font-size", 10)
+    .attr("text-anchor", "end")
+    .selectAll("g")
+    .data(Category)
+    .enter().append("g")
+    .attr("transform", function(d, i)  { return "translate(-50," + (i * 20 + 200) + ")"; });
+
+// defining rectangle for categories
+category_legend.append("rect")
+    .attr("width",9)
+    .attr("height",9)
+    .attr("x",1100)
+    .attr("y",5)
+    .attr("fill", function (d){
+        if(d == "Airplane"){
+            return "DeepPink";
+        }
+        else if(d == "Balloon"){
+            return "Teal";
+        }
+        else if(d == "Glider"){
+            return "Crimson";
+        }
+        else  if(d == "Gyrocraft"){
+            return "Orange";
+        }
+        else if(d == "Gyroplane"){
+            return "navy";
+        }
+        else if(d == "Helicopter"){
+            return "#f03b20";
+        }
+        else if(d == "Powered Parachute"){
+            return "#e6f598";
+        }
+        else if(d == "Rocket"){
+            return "#66c2a5";
+        }
+        else if(d == "Ultralight"){
+            return "#253494";
+        }
+        else if(d == "Weight-Shift"){
+            return "#955555";
+        }
+        else{
+            return "#125425"
+        }
+    });
+
+//append the text category
+category_legend.append("text")
+    .attr("x", width - 24)
+    .attr("y", 9.5)
+    .attr("dy", "0.32em")
+    .style("fill","white")
+    .text(function(d) { return d; });
+
+//json for importing US map
+d3.json("usmap.json", function(usdata) {
+
+    g.selectAll("path")
+        .data(usdata.features)
+        .enter()
+        .append("path")
+        .attr("d", map_path)
+        .style("stroke-width", "1")
+        .style("stroke", "#fcf9ff")
+        .style("fill",function(d){
+            return color(d.properties.NAME);})
+        .on("click",clicked);
+})
+
+//json for importing US data file
+d3.json("my_us_file.json",function(years_data) {
+
+    years_data.forEach(function (d) {
+        d.year = +d.year;
+        if (!d.AircraftCategory) {
+            d.AircraftCategory = "Unknown";
+        }
+    });
+
+    d3.select('#selection_box')
+        .on("change", function () {
+            var sect = document.getElementById("selection_box");
+            var section = sect.options[sect.selectedIndex].value;
+
+            data = select_data(years_data, 'year', section);
+
+            //update points on graph
+            updateGraph(data);
+        })
+
+    // intial map set to 2012
+    data = select_data(years_data, 'year', 2012);
+    updateGraph(data);
+
+});
+
+
+    function updateGraph(data){
+
+        svg_area.selectAll("circle").remove();
+        point = g.selectAll("circle");
+        point.data(data)
+            .enter()
+            .append("circle")
+            .attr("r", "3px")
+            .attr("transform", function (d) {
+                if( map_projection([
+                        d.Longitude,
+                        d.Latitude]
+                    ) != null)
+                return "translate(" + map_projection([
+                        d.Longitude,
+                        d.Latitude
+                    ]) + ")";
+            })
+            .attr("fill",
+                function (d){
+
+                    if(d.AircraftCategory == "Airplane"){
+                        return "DeepPink";
+                    }
+                    else if(d.AircraftCategory == "Balloon"){
+                        return "Teal";
+                    }
+                    else if(d.AircraftCategory == "Glider"){
+                        return "Crimson";
+                    }
+                    else  if(d.AircraftCategory == "Gyrocraft"){
+                        return "Orange";
+                    }
+                    else if(d.AircraftCategory == "Gyroplane"){
+                        return "navy";
+                    }
+                    else if(d.AircraftCategory == "Helicopter"){
+                        return "#f03b20";
+                    }
+                    else if(d.AircraftCategory == "Powered Parachute"){
+                        return "#e6f598";
+                    }
+                    else if(d.AircraftCategory == "Rocket"){
+                        return "#66c2a5";
+                    }
+                    else if(d.AircraftCategory == "Ultralight"){
+                        return "#253494";
+                    }
+                    else if(d.AircraftCategory == "Weight-Shift"){
+                        return "#955555";
+                    }
+                    else{
+                        return "#125425"
+                    }
+                })
+            .style("stroke", "black")
+            .style("opacity","0.7")
+            .style("stroke-width", "0.3")
+            .on("mouseover", function(d) {
+                div.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                div	.html("Year:"+d.year + "<br/>"+"Damage : "+d.AircraftDamage+"<br/>"+"Category : "+d.AircraftCategory+"<br/>"+"Country : "+d.Country)
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top", (d3.event.pageY - 28) + "px");
+            })
+            .on("mouseout", function(d) {
+                div.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+            });
+
+    }
+
+function clicked(d) {
+    var map_x, map_y, zoom;
+
+    if (d && centered !== d) {
+        var centroid = map_path.centroid(d);
+        map_x = centroid[0];
+        map_y = centroid[1];
+        zoom = 3;
+        centered = d;
+    } else {
+        map_x = width / 2;
+        map_y = height / 2;
+        zoom = 1;
+        centered = null;
+    }
+    g.transition()
+        .duration(750)
+        .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + zoom + ")translate(" + -map_x + "," + -map_y + ")")
+        .style("stroke-width", 1.5 / zoom + "px");
+}
+
+</script>
+
+<h4>Aviation Accidents accross USA</h4>
+
+
+</body>
+</html>
